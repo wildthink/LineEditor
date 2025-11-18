@@ -4,9 +4,17 @@ A tiny Swift wrapper around the system libedita.a line editor.
 It provides interactive line input for terminal apps with history and
 simple prefix-based tab completion — all from Swift.
 
+Convience methods are provided to easily integrate ParsableCommands.
+
 ## Example Usage
 
+Refer to [`repl.swift`](Sources/repl/repl.swift) for the complete example.
+
 ``` swift
+
+struct MyParsableCommand: ParsableCommand {
+    ...
+}
 
 struct ExampleLineEditor {
     
@@ -19,7 +27,7 @@ struct ExampleLineEditor {
         // Load history file
         try? editor.loadHistory(at: history_file)
         
-        // Provide demo completions
+        // Provide some completions
         editor.setCompletions(["exit", "list", "load", "save"])
         
         print("LineEditor demo. Tab for completion, Ctrl-D to quit.")
@@ -30,11 +38,12 @@ struct ExampleLineEditor {
             if !line.isEmpty { editor.addHistory(line) }
             if line == "exit" { break }
             let words = line.split(separator: " ")
+            
             if words.first == "cmd" {
                 do {
-                    try CommandREPL.evaluate(argv: words.dropFirst())
+                    try MyParsableCommand.evaluate(argv: words.dropFirst())
                 } catch {
-                    CommandREPL.report(error: error)
+                    MyParsableCommand.report(error: error)
                 }
             } else {
                 print("echo: \(line)")

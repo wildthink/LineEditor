@@ -52,6 +52,11 @@ struct HelloWorld: ParsableCommand {
 /// lines beginning with `cmd` to the `HelloWorld` command using the
 /// `CommandREPL` evaluation helpers.
 @main
+struct Repl: CommandREPL {
+    typealias Cmd = HelloWorld
+}
+
+@MainActor
 struct repl {
     /// Starts the interactive REPL session.
     ///

@@ -43,6 +43,7 @@ let package = Package(
             name: "CommandREPL",
             dependencies: [
                 "LineEditor",
+                "CLibEdit",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
         ),

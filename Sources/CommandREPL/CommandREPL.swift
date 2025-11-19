@@ -21,7 +21,21 @@ import Foundation
 /// formatted help message for the command that failed, or `report(error:)` to
 /// print it directly.
 public extension ParsableCommand {
-        
+
+    /// Parses and runs the command from an array of string Sequences.
+    ///
+    /// The input is expected to mirror `CommandLine.arguments`
+    /// and also captures and prints any errors
+    ///
+    /// - Parameter argv: Pre-tokenized arguments as string subsequences.
+    static func evaluateAsRoot(argv: some Sequence<some StringProtocol>) {
+        do {
+            try evaluate(argv: Array(argv))
+        } catch {
+            report(error: error)
+        }
+    }
+
     /// Parses and runs the command from a single command line string.
     ///
     /// The string is split on spaces to form an argument vector and then parsed
@@ -36,38 +50,26 @@ public extension ParsableCommand {
         try evaluate(argv: argv)
     }
     
-    /// Parses and runs the command from an array of string subsequences.
+    /// Parses and runs the command from an array of string Sequences.
     ///
-    /// Use this overload when your tokenizer yields `String.SubSequence` tokens.
+    /// Use this overload when your tokenizer yields `SubSequence<String>` tokens.
     /// The tokens are converted to `String` and forwarded to the primary
     /// `[String]` overload.
     ///
     /// - Parameter argv: Pre-tokenized arguments as string subsequences.
     /// - Throws: An error if parsing fails or if `run()` throws.
-    static func evaluate(argv: [String.SubSequence]) throws {
-        try evaluate(argv: argv.map { String($0) })
-    }
-
-    /// Parses and runs the command from a slice of string subsequences.
-    ///
-    /// This is useful when working with slices of a larger token array without
-    /// copying. The slice is mapped to `String` and forwarded to the primary
-    /// `[String]` overload.
-    ///
-    /// - Parameter argv: A slice of pre-tokenized arguments.
-    /// - Throws: An error if parsing fails or if `run()` throws.
-    static func evaluate(argv: Array<String.SubSequence>.SubSequence) throws {
+    static func evaluate(argv: some Sequence<String>) throws {
         try evaluate(argv: argv.map { String($0) })
     }
 
     /// Parses and runs the command from an array of `StringProtocol` values.
     ///
     /// This generic convenience overload accepts any collection of strings
-    /// conforming to `StringProtocol` and forwards them as `[String]`.
+    /// conforming to `StringProtocol` and forwards them as `Sequence<String>`.
     ///
     /// - Parameter argv: Pre-tokenized arguments as `StringProtocol` values.
     /// - Throws: An error if parsing fails or if `run()` throws.
-    static func evaluate<S: StringProtocol>(argv: [S]) throws {
+    static func evaluate<S: StringProtocol>(argv: Sequence<S>) throws {
         try evaluate(argv: argv.map { String($0) })
     }
     
@@ -103,7 +105,7 @@ public extension ParsableCommand {
                     if let last = stack.last {
                         var str = ""
                         print(last.helpMessage(columns: maxColumns), to: &str)
-                        return str
+                        return str.trimmingCharacters(in: .whitespacesAndNewlines)
                     }
                 default:
                     break

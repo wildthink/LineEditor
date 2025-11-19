@@ -31,7 +31,8 @@ public extension CommandREPL {
         {
             try run()
         } else {
-            Cmd.evaluateAsRoot(argv: CommandLine.arguments)
+            Cmd.evaluateAsRoot(
+                argv: CommandLine.arguments.dropFirst())
         }
     }
     

@@ -13,6 +13,8 @@ int   le_read_history(const char *path);               // 0 on success, -1 on er
 int   le_write_history(const char *path);              // 0 on success, -1 on error
 void  le_clear_history(void);
 
+int le_ding (void);
+
 // Optional: initialize readline state (keymaps, etc.)
 void  le_initialize(void);
 

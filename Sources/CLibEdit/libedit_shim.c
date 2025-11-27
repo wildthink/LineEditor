@@ -1,6 +1,7 @@
 // Sources/CLibEdit/libedit_shim.c
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <editline/readline.h>   // libedit’s readline-compat headers
 
 // Define a stable generator type matching readline/libedit's completion entry signature.
@@ -39,6 +40,29 @@ void le_clear_history(void) {
 
 void le_initialize(void) {
     rl_initialize();
+}
+
+// Some platforms/libedit builds don't declare rl_ding; provide a weak declaration if available
+#if defined(__has_include)
+  #if __has_include(<editline/readline.h>)
+    /* header already included above; some variants still omit prototype for rl_ding */
+  #endif
+#endif
+
+#ifndef HAVE_RL_DING_DECL
+/* Try to declare rl_ding if the symbol exists at link time; if not, we'll fallback. */
+extern int rl_ding(void);
+#endif
+
+int le_ding(void) {
+#ifdef rl_ding
+    return rl_ding();
+#else
+    /* Fallback: emit terminal bell. Return 0 to mimic success. */
+    fputc('\a', stdout);
+    fflush(stdout);
+    return 0;
+#endif
 }
 
 // Completion: supply a generator and let libedit build the match list.

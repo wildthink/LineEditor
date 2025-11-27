@@ -33,6 +33,10 @@ public struct LineEditor {
         le_initialize()
     }
 
+    public func ding() {
+        le_ding()
+    }
+    
     /// Reads a single line of input from the terminal.
     ///
     /// - Parameter prompt: The prompt to display before reading input.

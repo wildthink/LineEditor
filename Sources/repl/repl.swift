@@ -52,8 +52,10 @@ struct HelloWorld: ParsableCommand {
 /// lines beginning with `cmd` to the `HelloWorld` command using the
 /// `CommandREPL` evaluation helpers.
 @main
-struct Repl: CommandREPL {
-    typealias Cmd = HelloWorld
+struct DemoMain {
+    static func main() throws {
+        try CommandREPLRunner<HelloWorld>.main()
+    }
 }
 
 @MainActor

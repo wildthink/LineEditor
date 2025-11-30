@@ -65,6 +65,7 @@ struct repl {
     /// The loop continues until the user types `exit` or sends EOF (Ctrl-D).
     static func main() {
         
+//        rl_compl
         var editor = LineEditor()
         
         /// Returns the path to the persistent history file in the user's home directory.
@@ -90,7 +91,7 @@ struct repl {
         /// - Exits on `exit`
         /// - If input begins with `cmd`, forwards the remainder to `HelloWorld`
         /// - Otherwise echoes the input
-        while let line = editor.readLine(prompt: "edit> ")?
+        while let line = editor.readLine(prompt: "repl > ")?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         {
             if !line.isEmpty { editor.addHistory(line) }

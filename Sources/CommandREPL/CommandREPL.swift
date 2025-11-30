@@ -16,7 +16,7 @@ import LineEditor
 /// It loads and saves history, configures completion candidates, and routes
 /// lines beginning with ParsableCommand._commandName to ParsableCommand
 /// type using the an instantiation of`CommandREPL<Cmd>`.
-
+@MainActor
 public struct CommandREPLRunner<Cmd: ParsableCommand> {
     public typealias Command = Cmd
     public let cmd: Cmd.Type
@@ -59,7 +59,7 @@ public struct CommandREPLRunner<Cmd: ParsableCommand> {
         ///
         /// - Adds non-empty inputs to history
         /// - Exits on `exit`
-         while let line = editor.readLine(prompt: "\(cmd._commandName)> ")?
+         while let line = editor.readLine(prompt: "\(cmd._commandName) > ")?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         {
             if !line.isEmpty { editor.addHistory(line) }

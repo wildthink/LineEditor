@@ -138,8 +138,20 @@ public struct LineEditor {
 final class CompletionBox {
     private let words: [String]
     init(words: [String]) { self.words = words }
+    
     func matches(prefix: String) -> [String] {
-        words.filter { $0.hasPrefix(prefix) }
+        // jmj -> stderr
+//        try? FileHandle.standardError
+//            .print("completion for '\(prefix)'")
+        return words.filter { $0.hasPrefix(prefix) }
+    }
+}
+
+extension FileHandle {
+    func print(_ string: String, as encoding: String.Encoding = .utf8) throws {
+        guard let data = string.data(using: encoding)
+        else { return }
+        try self.write(contentsOf: data)
     }
 }
 

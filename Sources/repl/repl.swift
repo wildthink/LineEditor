@@ -54,7 +54,7 @@ struct HelloWorld: ParsableCommand {
 @main
 struct DemoMain {
     static func main() throws {
-        try CommandREPLRunner<HelloWorld>.main()
+        try CommandREPLRunner<HelloWorld>().run()
     }
 }
 

@@ -28,9 +28,15 @@ import CLibEdit
 /// - Note: The underlying C library is initialized in `init()` and completion
 ///   callbacks are installed via `setCompletions(_:)`.
 public struct LineEditor {
+    
+    public var historyFile: String?
+    public var terminal: String {
+        ProcessInfo.processInfo.environment["TERM"] ?? "dumb"
+    }
+    
     /// Creates a new line editor and initializes the underlying C library.
-    public init() {
-        le_initialize()
+    public init(historyFile: String? = nil) {
+        self.historyFile = historyFile
     }
 
     public func ding() {
@@ -41,11 +47,16 @@ public struct LineEditor {
     ///
     /// - Parameter prompt: The prompt to display before reading input.
     /// - Returns: The entered line as a `String`, or `nil` on EOF (for example, when the user presses Ctrl-D).
-    public func readLine(prompt: String = "") -> String? {
-        return prompt.withCString { cPrompt in
-            guard let raw = le_readline(cPrompt) else { return nil } // EOF (Ctrl-D)
-            defer { free(raw) }
-            return String(cString: raw)
+    func readLine(prompt: String = "") -> String? {
+        if terminal == "dumb" {
+            print(prompt, terminator: "")
+            return Swift.readLine()
+        } else {
+            return prompt.withCString { cPrompt in
+                guard let raw = le_readline(cPrompt) else { return nil } // EOF (Ctrl-D)
+                defer { free(raw) }
+                return String(cString: raw)
+            }
         }
     }
 
@@ -120,7 +131,7 @@ public struct LineEditor {
 
         let generator: @convention(c) (UnsafePointer<CChar>?, Int32) -> UnsafeMutablePointer<CChar>? = { cText, state in
             let text = cText.map { String(cString: $0) } ?? ""
-            let matches = LineEditor.shared?.matches(prefix: text) ?? []
+            let matches = LineEditor.shared?.completions(for: text) ?? []
             let idx = Int(state)
             guard idx < matches.count else { return nil }
             return strdup(matches[idx])
@@ -139,10 +150,7 @@ final class CompletionBox {
     private let words: [String]
     init(words: [String]) { self.words = words }
     
-    func matches(prefix: String) -> [String] {
-        // jmj -> stderr
-//        try? FileHandle.standardError
-//            .print("completion for '\(prefix)'")
+    func completions(for prefix: String) -> [String] {
         return words.filter { $0.hasPrefix(prefix) }
     }
 }
@@ -155,9 +163,63 @@ extension FileHandle {
     }
 }
 
-/// Historical note: An earlier design placed the shared completion storage in
-/// /// a separate `CompletionStore` enum. The current implementation keeps this
-/// /// as a static on ``LineEditor`` to simplify symbol scoping and DocC links.
-// enum CompletionStore {
-//     @MainActor static var shared: CompletionBox?
-// }
+public extension LineEditor {
+    enum Action { case step, exit }
+    
+    init(historyPrefix: String) {
+        self = .init(historyFile: Self.homeHistoryFile(prefix: historyPrefix))
+    }
+    
+    static func homeHistoryFile(prefix: String = "repl") -> String {
+        let home = ProcessInfo.processInfo.environment["HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.path
+        return "\(home)/.\(prefix)_history"
+    }
+    
+    func readEvaluateLoop(
+        prompt: String,
+        edit: Bool? = nil,
+        eval: (String) -> LineEditor.Action
+    ) {
+        if edit ?? (terminal != "dumb") {
+            editEvaluateLoop(prompt: prompt, eval: eval)
+        } else {
+            readLineEvaluateLoop(prompt: prompt, eval: eval)
+        }
+    }
+    
+    func readLineEvaluateLoop(prompt: String, eval: (String) -> LineEditor.Action) {
+        
+        print(prompt, terminator: "")
+        while let line = readLine()?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        {
+            let step = eval(line)
+            if step == .exit { break }
+            print(prompt, terminator: "")
+        }
+        print("")
+    }
+    
+    func editEvaluateLoop(prompt: String, eval: (String) -> Action) {
+        
+        le_initialize()
+        if let historyFile {
+            try? loadHistory(at: historyFile)
+        }
+
+        while let line = readLine(prompt: prompt)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        {
+            if !line.isEmpty { addHistory(line) }
+            let step = eval(line)
+            if step == .exit { break }
+        }
+        print("")
+        guard let historyFile else { return }
+        do {
+            try saveHistory(to: historyFile)
+        } catch {
+            fputs("Warning: \(error)\n", stderr)
+        }
+    }
+}

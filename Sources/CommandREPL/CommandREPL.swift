@@ -10,6 +10,11 @@ import ArgumentParser
 import Foundation
 import LineEditor
 
+public protocol InteractiveCommand {
+    var commandName: String { get }
+    func evaluate(input line: String) throws
+}
+
 /// The REPL Tool Protocol
 ///
 /// This type configures and runs an interactive loop backed by `LineEditor`.
@@ -17,19 +22,22 @@ import LineEditor
 /// lines beginning with ParsableCommand._commandName to ParsableCommand
 /// type using the an instantiation of`CommandREPL<Cmd>`.
 @MainActor
-public struct CommandREPLRunner<Cmd: ParsableCommand> {
-    public typealias Command = Cmd
-    public let cmd: Cmd.Type
-    /// Returns the path to the persistent history file in the user's home directory.
+public struct CommandREPLRunner {
+    public let cmd: any ParsableCommand.Type
     public var historyPath: String
-    
-    public init(cmd: Cmd.Type = Cmd.self, historyPath: String? = nil) {
+
+    public init<C: ParsableCommand>(
+        cmd: C.Type,
+        historyPath: String? = nil
+    ) {
+
         self.cmd = cmd
         if let historyPath {
             self.historyPath = historyPath
         } else {
+            /// Returns the path to the persistent history file in the user's home directory.
             let home = ProcessInfo.processInfo.environment["HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.path
-            self.historyPath = "\(home)/.\(cmd._commandName)_history"
+            self.historyPath = "\(home)/.\(cmd.commandName)_history"
         }
     }
     
@@ -61,37 +69,13 @@ public struct CommandREPLRunner<Cmd: ParsableCommand> {
         try cmd.evaluate(argv: words)
     }
 
-    public func run(useLineEditor: Bool? = nil) throws {
-        if useLineEditor ?? !isDebuggerAttached() {
-            try runLineEditor()
-        } else {
-            while true {
-                let prompt = "\(cmd._commandName) > "
-                
-                print(prompt, terminator: "")
-                if let line = readLine(strippingNewline: true) {
-                    if line.hasPrefix(".exit") { break }
-                    do {
-                        try handle(input: line)
-                    } catch {
-                        cmd.report(error: error)
-                    }
-                } else {
-                    break
-                }
-            }
-        }
-    }
     /// Starts the interactive REPL session.
     ///
     /// The loop continues until the user types `exit` or sends EOF (Ctrl-D).
-    @MainActor public func runLineEditor() throws {
+    @MainActor public func run() throws {
         
-        var editor = LineEditor()
-                
-        // Load history file (ignore errors if missing)
-        try? editor.loadHistory(at: historyPath)
-        
+        var editor = LineEditor(historyFile: historyPath)
+
         /// Configure a small set of completion candidates for demonstration.
         let cmds = cmd.configuration.subcommands
         var cmd_names: [String] = []
@@ -108,41 +92,22 @@ public struct CommandREPLRunner<Cmd: ParsableCommand> {
         ///
         /// - Adds non-empty inputs to history
         /// - Exits on `exit`
-         while let line = editor.readLine(prompt: "\(cmd._commandName) > ")?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        {
-            if !line.isEmpty { editor.addHistory(line) }
+        editor.readEvaluateLoop(prompt: "\(cmd._commandName) > ") { line in
+            if line == ".exit" { return .exit }
              do {
                  try handle(input: line)
              } catch {
                  cmd.report(error: error)
              }
-        }
-        print("")
-        
-        /// Persist history on exit (errors are reported to stderr but do not abort).
-        do { try editor.saveHistory(to: historyPath) } catch {
-            fputs("Warning: \(error)\n", stderr)
-        }
-    }
-}
-
-public extension CommandREPLRunner {
-    @MainActor
-    static func main() throws {
-        
-        if CommandLine.arguments.contains("-i")
-            || CommandLine.arguments.contains("-repl")
-        {
-            try Self(cmd: Command.self).run()
-        } else {
-            Cmd.evaluateAsRoot(
-                argv: CommandLine.arguments.dropFirst())
+            return .step
         }
     }
 }
 
 public extension ParsableCommand {
+    
+    static var commandName: String { _commandName }
+    
     @MainActor
     static func readEvalPrintLoop() throws {
         try CommandREPLRunner(cmd: self).run()

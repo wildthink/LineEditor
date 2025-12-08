@@ -10,53 +10,46 @@ Convience methods are provided to easily integrate ParsableCommands.
 
 Refer to [`repl.swift`](Sources/repl/repl.swift) for the complete example.
 
+The `CommandREPLRunner` makes it easy to wrap your `ParsableCommands` with
+and interactive REPL.
+
 ``` swift
 
-struct MyParsableCommand: ParsableCommand {
+struct HelloWorld: ParsableCommand {
     ...
 }
 
+@main
+struct DemoMain {
+    static func main() throws {
+        try CommandREPLRunner(cmd: HelloWorld.self).run()
+    }
+}
+```
+
+Or you can easily "roll-your-own" evaluater loop.
+
+``` swift
 struct ExampleLineEditor {
     
     @MainActor
     func run() {
+        var editor = LineEditor(historyPrefix: "repl")
         
-        var editor = LineEditor()
-        var history_file = "~/.example_history"
+        /// Configure a small set of completion candidates for demonstration.
+        editor.setCompletions([
+            "help", "hello", "halt", "history", "host", "hover",
+            "exit", "list", "load", "save"
+        ])
         
-        // Load history file
-        try? editor.loadHistory(at: history_file)
+        print("Libedit demo. Tab for completion, Ctrl-D to quit.")
         
-        // Provide some completions
-        editor.setCompletions(["exit", "list", "load", "save"])
-        
-        print("LineEditor demo. Tab for completion, Ctrl-D to quit.")
-        
-        while let line = editor.readLine(prompt: "edit> ")?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        {
-            if !line.isEmpty { editor.addHistory(line) }
-            if line == "exit" { break }
-            let words = line.split(separator: " ")
-            
-            if words.first == "cmd" {
-                do {
-                    try MyParsableCommand.evaluate(argv: words.dropFirst())
-                } catch {
-                    MyParsableCommand.report(error: error)
-                }
-            } else {
-                print("echo: \(line)")
-            }
-            
-        }
-        
-        print("")
-        
-        // Save history on exit
-        do { try editor.saveHistory(to: history_file) }
-        catch {
-            print("Warning: \(error)\n", stderr)
+        /// Read, evaluate, and print loop.
+        /// - Exits on `.exit`
+        editor.readEvaluateLoop(prompt: "repl > ") { line in
+            if line == ".exit" { return .exit }
+            print("echo: \(line)")
+            return .step
         }
     }
 }
@@ -74,12 +67,12 @@ project, it's as simple as adding it to your `Package.swift`:
 
 ``` swift
 dependencies: [
-  .package(url: "https://github.com/wildthink/LineEditor", from: "1.0.0")
+  .package(url: "https://github.com/wildthink/LineEditor", from: "1.0.4"),
 ]
 ```
 
 And then adding the product to any target that needs access to the library:
 
 ```swift
-.product(name: "LineEditor", package: "LineEditor"),
+    .product(name: "LineEditor", package: "LineEditor"),
 ```

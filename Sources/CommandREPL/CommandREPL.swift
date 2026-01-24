@@ -13,6 +13,7 @@ import LineEditor
 public protocol InteractiveCommand {
     var commandName: String { get }
     func evaluate(input line: String) throws
+    var interactive: Bool { get }
 }
 
 /// The REPL Tool Protocol
@@ -40,22 +41,7 @@ public struct CommandREPLRunner {
             self.historyPath = "\(home)/.\(cmd.commandName)_history"
         }
     }
-    
-    func isDebuggerAttached() -> Bool {
-        var info = kinfo_proc()
-        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
-        var size = MemoryLayout.stride(ofValue: info)
         
-        let sysctlResult = sysctl(&mib, UInt32(mib.count), &info, &size, nil, 0)
-        
-        guard sysctlResult == 0 else {
-            assertionFailure("sysctl failed")
-            return false
-        }
-        
-        return (info.kp_proc.p_flag & P_TRACED) != 0
-    }
-    
     public func handle(input line: String) throws {
         if line == ".exit" { return }
         let words = line.split(separator: " ")
@@ -69,15 +55,50 @@ public struct CommandREPLRunner {
         try cmd.evaluate(argv: words)
     }
 
+    func subcmd<S: StringProtocol>(for argv: [S]) -> (Int, (any ParsableCommand.Type)?) {
+        var pc: ParsableCommand.Type? = cmd
+        var next: ParsableCommand.Type? = cmd
+
+        var count = 0
+        for sub_cmd in argv {
+            next = next?.configuration.subcommands
+                .first { $0._commandName == sub_cmd }
+            if let next {
+                pc = next
+                count += 1
+            }
+        }
+        return (count, pc)
+    }
+    
+    @MainActor public func run() throws {
+        let argv: [String] = CommandLine.arguments
+        let args = Array(argv.dropFirst())
+        let (ndx, subc) = subcmd(for: args)
+        let root = subc ?? cmd
+        let rargv = Array(args.dropFirst(ndx))
+        do {
+            var next = try root.parseAsRoot(rargv)
+            if let icmd = next as? InteractiveCommand,
+               icmd.interactive {
+                try repl(icmd: next)
+            } else {
+                try next.run()
+            }
+        } catch {
+            root.report(error: error)
+        }
+    }
+    
     /// Starts the interactive REPL session.
     ///
     /// The loop continues until the user types `exit` or sends EOF (Ctrl-D).
-    @MainActor public func run() throws {
+    @MainActor public func repl<C: ParsableCommand>(icmd: C) throws {
         
         var editor = LineEditor(historyFile: historyPath)
 
         /// Configure a small set of completion candidates for demonstration.
-        let cmds = cmd.configuration.subcommands
+        let cmds = C.configuration.subcommands
         var cmd_names: [String] = []
         
         for cmd in cmds {
@@ -104,6 +125,7 @@ public struct CommandREPLRunner {
     }
 }
 
+
 public extension ParsableCommand {
     
     static var commandName: String { _commandName }
@@ -114,3 +136,4 @@ public extension ParsableCommand {
     }
 }
 #endif
+

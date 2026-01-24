@@ -99,6 +99,15 @@ public extension ParsableCommand {
     /// - Returns: A help string suitable for displaying to the user.
     static func helpMessage(for error: Error, maxColumns: Int = 80) -> String {
         let m = Mirror(reflecting: error)
+
+        if let cleanExit = error as? CleanExit {
+            if let helpRequest = m.descendant("base", "helpRequest"),
+               let pt = helpRequest as? ParsableCommand.Type
+            {
+                return pt.helpMessage()
+            }
+        }
+
         for c in m.children {
             switch c.value {
                 case let stack as [ParsableCommand.Type]:
@@ -111,7 +120,7 @@ public extension ParsableCommand {
                     break
             }
         }
-        return "No help available for \(error.localizedDescription)"
+        return "\(self._commandName) - \(error)"
     }
     
     /// Prints a help message for an error to standard output.

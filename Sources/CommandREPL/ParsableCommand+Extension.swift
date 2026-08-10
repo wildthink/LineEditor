@@ -85,7 +85,50 @@ public extension ParsableCommand {
         var cmd = try Self.parseAsRoot(argv)
         try cmd.run()
     }
-    
+
+    /// Parses and runs the command, awaiting `run()` when the resolved command
+    /// is asynchronous.
+    ///
+    /// Prefer this over the synchronous overload whenever the command tree
+    /// contains any `AsyncParsableCommand`. `ParsableCommand` supplies a default
+    /// synchronous `run()` that merely prints the help screen, so calling the
+    /// sync path on an async command silently does nothing useful.
+    ///
+    /// Note that the resolved command may be async even when `Self` is not --
+    /// only the subcommand that actually parsed matters, so the check happens on
+    /// the parsed instance rather than on `Self`.
+    ///
+    /// - Parameter argv: The argument vector, where the first element is typically
+    ///   the subcommand name (if any) followed by options and operands.
+    /// - Throws: An error if parsing fails or if `run()` throws.
+    static func evaluate(argv: [String]) async throws {
+        let cmd = try Self.parseAsRoot(argv)
+        if var asyncCommand = cmd as? AsyncParsableCommand {
+            try await asyncCommand.run()
+        } else {
+            var syncCommand = cmd
+            try syncCommand.run()
+        }
+    }
+
+    /// Parses and runs the command from a single line, awaiting async commands.
+    ///
+    /// The line is tokenized with ``Tokenizer``, so quoted arguments and escaped
+    /// spaces survive -- unlike the synchronous ``evaluate(line:)``, which splits
+    /// naively on spaces.
+    static func evaluate(line: String) async throws {
+        try await evaluate(argv: Tokenizer.tokens(in: line).map(\.text))
+    }
+
+    /// Parses and runs the command, reporting any error rather than throwing.
+    static func evaluateAsRoot(argv: [String]) async {
+        do {
+            try await evaluate(argv: argv)
+        } catch {
+            report(error: error)
+        }
+    }
+
     /// Returns a formatted help message for a parsing error.
     ///
     /// If the provided `error` contains an ArgumentParser command type stack,
@@ -100,7 +143,7 @@ public extension ParsableCommand {
     static func helpMessage(for error: Error, maxColumns: Int = 80) -> String {
         let m = Mirror(reflecting: error)
 
-        if let cleanExit = error as? CleanExit {
+        if error is CleanExit {
             if let helpRequest = m.descendant("base", "helpRequest"),
                let pt = helpRequest as? ParsableCommand.Type
             {

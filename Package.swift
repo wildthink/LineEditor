@@ -1,8 +1,10 @@
 // swift-tools-version: 6.2
-// This package builds a simple Swift wrapper for libedit (BSD readline).
-// On macOS, libedit is available by default.
-// On Linux, install the dev package (e.g., `sudo apt-get install libedit-dev`).
-// Some Linux distros require linking ncurses as well; we include it as needed.
+// A Swift line editor and interactive command shell for ArgumentParser tools.
+//
+// Backed by bestline (https://github.com/mattt/bestline-swift), which vendors
+// Justine Tunney's single-file bestline.c. Unlike readline/libedit, bestline
+// hands the completion callback the whole buffer plus the cursor position and
+// supports inline hints -- both prerequisites for context-aware completion.
 
 import PackageDescription
 
@@ -16,7 +18,6 @@ let package = Package(
             name: "LineEditor",
             targets: [
                 "LineEditor",
-                "CLibEdit",
             ]
         ),
         .library(
@@ -24,26 +25,28 @@ let package = Package(
             targets: [
                 "CommandREPL",
                 "LineEditor",
-                "CLibEdit",
             ]
         ),
         .executable(name: "repl", targets: ["repl"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
+        // 1.8.0 is the floor for the ToolInfoV0 fields the completion engine
+        // reads: CommandInfoV0.aliases plus ArgumentInfoV0.allValues,
+        // allValueDescriptions, and completionKind.
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.8.0"),
+        .package(url: "https://github.com/mattt/bestline-swift.git", from: "1.0.0"),
     ],
     targets: [
         .target(
             name: "LineEditor",
             dependencies: [
-                "CLibEdit",
+                .product(name: "Bestline", package: "bestline-swift"),
             ],
         ),
         .target(
             name: "CommandREPL",
             dependencies: [
                 "LineEditor",
-                "CLibEdit",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
         ),
@@ -55,15 +58,13 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
         ),
-        // C shim target that wraps libedit functions in a stable ABI
-        .target(
-            name: "CLibEdit",
-            path: "Sources/CLibEdit",
-            publicHeadersPath: "include",
-            linkerSettings: [
-                .linkedLibrary("edit"),
-                .linkedLibrary("ncurses", .when(platforms: [.linux]))
-            ]
+        .testTarget(
+            name: "CommandREPLTests",
+            dependencies: [
+                "CommandREPL",
+                "LineEditor",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
         ),
     ]
 )

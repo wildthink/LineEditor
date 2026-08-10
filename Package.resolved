@@ -1,13 +1,22 @@
 {
-  "originHash" : "0f454406e2b7266faf9f9c422f666c64c458d3c9c8ad527236b6111ca54ca705",
+  "originHash" : "8b0643055f26c13b2486909e7578036a7a67d3bd8243e444b4ecb4a5eeccdaa8",
   "pins" : [
+    {
+      "identity" : "bestline-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mattt/bestline-swift.git",
+      "state" : {
+        "revision" : "de068b4aa27a4450b3d1ddc9b2525e17dc336b6e",
+        "version" : "1.0.0"
+      }
+    },
     {
       "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser.git",
       "state" : {
-        "revision" : "cdd0ef3755280949551dc26dee5de9ddeda89f54",
-        "version" : "1.6.2"
+        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+        "version" : "1.8.2"
       }
     }
   ],

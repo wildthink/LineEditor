@@ -1,0 +1,17 @@
+# code-monkey project config. https://github.com/<you>/code-monkey
+sources = ["Sources", "Tests"]
+exclude = ["**/.build/**", "**/.git/**", "**/DerivedData/**", "**/Generated/**"]
+audit = ".code-monkey/audit.log"
+
+[index]
+path = ".code-monkey/index.db"
+follow_gitignore = true
+
+[parse]
+include_private = true
+extract_doc_comments = true
+extract_ai_directives = true
+
+# Powers `calls` and `get --fields callers,callees`. Roughly quadruples the
+# index file; set false if you don't need the call graph.
+extract_call_sites = true

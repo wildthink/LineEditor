@@ -17,9 +17,10 @@ import Foundation
 /// string subsequences from tokenization, and generic `StringProtocol`
 /// collections, all funneled into a canonical `[String]` for parsing.
 ///
-/// In case of parsing errors, use `helpMessage(for:maxColumns:)` to retrieve a
-/// formatted help message for the command that failed, or `report(error:)` to
-/// print it directly.
+/// In case of parsing errors, `report(error:)` prints the error the way
+/// ArgumentParser's own `exit(withError:)` does: the message and its usage line, on
+/// standard error when the error is a genuine failure. Use `helpMessage(for:maxColumns:)`
+/// instead when what you want is the help screen for the command that failed.
 public extension ParsableCommand {
 
     /// Parses and runs the command from an array of string Sequences.
@@ -166,14 +167,41 @@ public extension ParsableCommand {
         return "\(self._commandName) - \(error)"
     }
     
-    /// Prints a help message for an error to standard output.
+    /// The text ``report(error:)`` prints for `error`, and where it belongs.
     ///
-    /// This is a convenience wrapper around `helpMessage(for:)` that writes the
-    /// resulting text to the default output stream.
+    /// Split out so an embedder that renders errors itself -- a GUI shell, a log, a
+    /// transcript -- can get the same text without printing, and so the routing can be
+    /// tested without capturing file descriptors.
+    ///
+    /// - Parameter error: The error produced during parsing or execution.
+    /// - Returns: The message and whether it describes a failure, or `nil` when there is
+    ///   nothing to print.
+    static func reportMessage(for error: Error) -> (text: String, isFailure: Bool)? {
+        let text = fullMessage(for: error)
+        guard !text.isEmpty else { return nil }
+        return (text, exitCode(for: error) != .success)
+    }
+
+    /// Prints `error` the way ArgumentParser's own `exit(withError:)` does, minus the exiting.
+    ///
+    /// A clean exit -- `--help`, `--version`, an explicit `CleanExit.message` -- goes to
+    /// standard output; anything else goes to standard error. A bare `ExitCode` prints
+    /// nothing, because the command that threw it has already written its own message.
+    ///
+    /// This reports through `fullMessage(for:)` rather than ``helpMessage(for:maxColumns:)``.
+    /// A help screen alone drops the error text -- the half that names the offending value
+    /// and lists the ones that are accepted -- which is the half worth reading when an option
+    /// is typed by hand. ``helpMessage(for:maxColumns:)`` remains available for callers that
+    /// want the screen instead.
     ///
     /// - Parameter error: The error produced during parsing or execution.
     static func report(error: Error) {
-        print(helpMessage(for: error))
+        guard let report = reportMessage(for: error) else { return }
+        if report.isFailure {
+            FileHandle.standardError.write(Data((report.text + "\n").utf8))
+        } else {
+            print(report.text)
+        }
     }
 }
 #endif
